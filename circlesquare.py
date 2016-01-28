@@ -426,4 +426,60 @@ class CircleSquare(object):
             pltcircles.plot(column='color', axes=axes, **kwargs)
             self.circlesquare.draw(axes, circles)
 
+def runner(num_vulns, max_area, tseries, burn_in=0):
+    """
+    Creates a new simulation, populates the various components, and 
+    simulates the discovery process
+    
+    Parameters
+    ----------
+    num_vulns: integer
+        The number of vulnerabilities to include in the model
+    
+    max_area: float (0-1)
+        The maximum likelihood that a vulnerability will be discovered
+    
+    tseries : list of timestamps
+        The times at which to sample the hardening process. 
+        Not required to increase by one, but required to be increasing.
+        
+    burn_in : integer
+        How many rounds of hardening are assumed to have 
+        taken place before the timeseries begins?
+        
+    Returns
+    -------
+    cumulative_discoveries : pandas Series (optional, default 0)
+        The cumulative number of discoveries made after the number
+        of rounds specified in the `tseries` parameter, 
+        after the burn-in period.
+       
+    Examples
+    --------
+    >>> run_it(1000, .01, range(5), 3)
+    0     0
+    1     4
+    2     6
+    3    11
+    4    15
+    """
+    model = CircleSquare()
+    model.make_pts(num_vulns)
 
+    seeker = model.new_interface('Seeker')
+    seeker.make_circles(max_area=max_area)
+    
+    seeker.harden(burn_in)
+    
+    t_0 = 0
+    round_counts = []
+    for t_1 in tseries:
+        seeker.harden(t_1-t_0)
+        round_counts.append({'round':model.rounds_hardened, 
+                             'total':model.count_pts()}) 
+        t_0 = t_1
+        
+    df = pd.DataFrame(index=tseries, data=round_counts)
+    cumulative_discoveries = df['total'].iloc[0] - df['total']
+
+    return cumulative_discoveries
